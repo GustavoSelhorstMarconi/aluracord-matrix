@@ -1,26 +1,66 @@
 import { Box, Text, TextField, Image, Button } from '@skynexui/components';
 import React from 'react';
 import appConfig from '../config.json';
+import { useRouter } from 'next/router'
+import { createClient } from '@supabase/supabase-js'
+import { ButtonSendSticker } from '../source/components/ButtonSendSticker'
 
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MzM3MTgxNSwiZXhwIjoxOTU4OTQ3ODE1fQ.kFbhkmI3XsN5hb3Ch7lnBCkBKQRU2TIvWHadGxRtSdo'
+const SUPABASE_URL = 'https://hqbrfwsohyarewevgmil.supabase.co'
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+function listenMessageInRealTime(addMessage) {
+  return supabaseClient
+    .from('messages')
+    .on('INSERT', (answerLive) => {
+      addMessage(answerLive.new)
+    })
+    .subscribe()
+}
 
 export default function ChatPage() {
+  const router = useRouter()
+  const loggedUser = router.query.username
   const [message, setmessage] = React.useState('')
   const [messageList, setMessageList] = React.useState([])
-  // Sua lógica vai aqui
 
-  // ./Sua lógica vai aqui
+  React.useEffect(() => {
+    supabaseClient
+      .from('messages')
+      .select('*')
+      .order('id', { ascending: false })
+      .then(({ data }) => {
+        setMessageList(data)
+      })
+
+    listenMessageInRealTime((newMessage) => {
+      setMessageList((currentListValue) => {
+        return [
+          newMessage,
+          ...currentListValue
+        ]
+      })
+    })
+  }, [])
 
   function handleNewMessage(newMessage) {
-    const message = {
-      id: messageList.length + 1,
-      from: 'eu',
-      text: newMessage
+    if (newMessage){
+      const message = {
+        from: loggedUser,
+        text: newMessage
+      }
+
+      supabaseClient
+        .from('messages')
+        .insert([
+          // Tem que ser um objeto com os mesmos campos que escreveu no banco
+          message
+        ])
+        .then(({ data }) => {
+          //console.log('criando mensagem: ', data)
+        })
+      setmessage('')
     }
-    setMessageList([
-      message,
-      ...messageList
-    ])
-    setmessage('')
   }
 
   return (
@@ -76,7 +116,7 @@ export default function ChatPage() {
               alignItems: 'center',
             }}
           >
-            <TextField
+            <TextField id='text'
               value={message}
               onChange={(event) => {
                 const valor = event.target.value
@@ -101,6 +141,26 @@ export default function ChatPage() {
                 color: appConfig.theme.colors.neutrals[200],
               }}
               />
+              <Button
+                label='Enviar'
+                onClick={() => {
+                  handleNewMessage(message)
+                  document.getElementById('text').focus()
+                }}
+                styleSheet={{
+                  backgroundColor: appConfig.theme.colors.neutrals[800],
+                  height: '83%',
+                  marginBottom: '8px',
+                  marginRight: '8px'
+                }}
+                />
+                {/* CallBack */}
+                <ButtonSendSticker 
+                  onStickerClick={(sticker) => {
+                    console.log('Salva esse sticker no banco', sticker)
+                    handleNewMessage(':sticker: ' + sticker)
+                  }}
+                />
           </Box>
         </Box>
       </Box>
@@ -109,21 +169,21 @@ export default function ChatPage() {
 }
 
 function Header() {
-    return (
-        <>
-            <Box styleSheet={{ width: '100%', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} >
-                <Text variant='heading5'>
-                    Chat
-                </Text>
-                <Button
-                    variant='tertiary'
-                    colorVariant='neutral'
-                    label='Logout'
-                    href="/"
-                />
-            </Box>
-        </>
-    )
+  return (
+    <>
+      <Box styleSheet={{ width: '100%', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} >
+      <Text variant='heading5'>
+        Chat
+      </Text>
+        <Button
+          variant='tertiary'
+          colorVariant='neutral'
+          label='Logout'
+          href="/"
+        />
+      </Box>
+    </>
+  )
 }
 
 function MessageList(props) {
@@ -167,7 +227,7 @@ function MessageList(props) {
               display: 'inline-block',
               marginRight: '8px',
             }}
-              src={`https://github.com/vanessametonini.png`}
+              src={`https://github.com/${message.from}.png`}
               />
               <Text tag="strong">
                 {message.from}
@@ -183,11 +243,17 @@ function MessageList(props) {
               {(new Date().toLocaleDateString())}
             </Text>
           </Box>
-        {message.text}
+          {/* Condicinal */}
+          {message.text.startsWith(':sticker:') 
+          ? (
+            <Image src={message.text.replace(':sticker:', '')} />
+          )
+          : (
+            message.text
+          )}
       </Text>
         )
       })}
-      
     </Box>
   )
 }
