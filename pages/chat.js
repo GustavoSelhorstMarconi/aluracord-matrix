@@ -18,6 +18,15 @@ function listenMessageInRealTime(addMessage) {
     .subscribe()
 }
 
+function formatedDate(message) {
+  var hourLocal = message.substr(11, 2)
+  hourLocal = Number(hourLocal) - 3
+  if (hourLocal < 0){
+    hourLocal = 24 - hourLocal
+  }
+  return (`${message.substr(8, 2)}/${message.substr(5, 2)}/${message.substr(0, 4)} ${hourLocal}${message.substr(13, 6)}`)
+}
+
 export default function ChatPage() {
   const router = useRouter()
   const loggedUser = router.query.username
@@ -240,7 +249,7 @@ function MessageList(props) {
                 }}
                 tag="span"
               >
-              {(new Date().toLocaleDateString())}
+              {(formatedDate(message.created_at))}
             </Text>
           </Box>
           {/* Condicinal */}
